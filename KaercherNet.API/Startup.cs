@@ -1,15 +1,11 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using Swashbuckle.AspNetCore.SwaggerGen;
-using System;
-using System.Collections.Generic;
+using IdentityServer4.AccessTokenValidation;
 
 namespace KaercherNet.API
 {
@@ -25,40 +21,41 @@ namespace KaercherNet.API
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddAuthentication("Bearer").AddJwtBearer("Bearer", options =>
+            services.AddCors(options =>
             {
-                options.Authority = "http://localhost:5000";
-                options.Audience = "kaerchernetApi";
-                options.RequireHttpsMetadata = false;
-                options.TokenValidationParameters = new TokenValidationParameters()
+                options.AddPolicy("AllRequests", builder =>
                 {
-                    ValidateAudience = false
-                };
+                    builder.AllowAnyHeader()
+                    .AllowAnyMethod()
+                    .SetIsOriginAllowed(origin => origin == "http://localhost:4200")
+                    .AllowCredentials();
+                });
             });
+
+            //services.AddAuthentication("Bearer").AddJwtBearer("Bearer", options =>
+            //{
+            //    options.Authority = "http://localhost:5000";
+            //    options.Audience = "kaerchernetApi";
+            //    options.RequireHttpsMetadata = false;
+            //    options.TokenValidationParameters = new TokenValidationParameters()
+            //    {
+            //        ValidateAudience = false
+            //    };
+            //});
+            services.AddAuthentication(IdentityServerAuthenticationDefaults.AuthenticationScheme)
+                       .AddIdentityServerAuthentication(options =>
+                       {
+                           options.Authority = "http://localhost:5000";
+                           options.ApiName = "kaerchernet-api";
+                           options.RequireHttpsMetadata = false;
+                       });
+
             services.AddDbContext<KaercherNetDbContext>(options => options.UseInMemoryDatabase("KaercherNetDbContext"));
             services.AddControllers();
 
             services.AddSwaggerGen(options =>
             {
                 options.SwaggerDoc("v1", new OpenApiInfo { Title = "KaercherNet API", Version = "v1" });
-               
-                //options.AddSecurityDefinition("oauth2", new OpenApiSecurityScheme
-                //{
-                //    Type = SecuritySchemeType.OAuth2,
-                //    Flows = new OpenApiOAuthFlows
-                //    {
-                //        Implicit = new OpenApiOAuthFlow
-                //        {
-                //            AuthorizationUrl = new Uri("http://localhost:5000/connect/authorize"),
-                //            TokenUrl = new Uri("http://localhost:5000/connect/token"),
-                //            Scopes = new Dictionary<string, string>
-                //            {
-                //                { "kaerchernetApi", "kaerchernetApi" }
-                //            }
-                //        }
-                //    }
-
-                //});
             });
         }
 
@@ -69,7 +66,7 @@ namespace KaercherNet.API
             {
                 app.UseDeveloperExceptionPage();
             }
-
+            app.UseCors("AllRequests");
             app.UseRouting();
 
             app.UseAuthentication();
